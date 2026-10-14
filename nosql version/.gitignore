@@ -1,0 +1,44 @@
+# Build results
+build/
+bin/
+obj/
+
+# Visual Studio Cache/Option Files
+.vs/
+.vscode/
+.cursor/
+
+# User-specific files
+*.rsuser
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Local history for Visual Studio
+.localhistory/
+
+# Visual Studio Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# OS Files
+.DS_Store
+Thumbs.db
+*.log
+
+# NuGet
+.nuget/
+*.nupkg
+*.snupkg
+
+# Runtime
+*.dll
+*.pdb
+*.exe
+
+# Web version
+.Web/*
