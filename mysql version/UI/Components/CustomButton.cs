@@ -1,0 +1,459 @@
+using System;
+using System.Drawing;
+using System.Drawing.Drawing2D;
+using System.Windows.Forms;
+
+namespace WarehouseManagement.UI.Components
+{
+    /// <summary>
+    /// Các kiểu button khả dụng
+    /// </summary>
+    public enum ButtonStyle
+    {
+        /// <summary>Nền BG, viền PrimaryColor</summary>
+        Outlined,
+        
+        /// <summary>Nền PrimaryColor, viền BG</summary>
+        Filled,
+        
+        /// <summary>Nền BG, viền Transparent</summary>
+        Text,
+        
+        /// <summary>Nền PrimaryColor, viền Transparent</summary>
+        FilledNoOutline,
+        
+        /// <summary>Nền đỏ (Semantic Error), viền Transparent</summary>
+        FilledNoOutlineRed,
+        
+        /// <summary>Nền và viền Transparent</summary>
+        Ghost,
+
+        /// <summary>Style cho Menu: Transparent default, Primary khi Hover/Selected</summary>
+        Menu
+    }
+
+    /// <summary>
+    /// Custom Button với 5 styles khác nhau, border radius và state management
+    /// </summary>
+    public class CustomButton : Button
+    {
+        private ButtonStyle _buttonStyle = ButtonStyle.Filled;
+        private int _borderRadius = UIConstants.Borders.RadiusMedium;
+        private bool _isHovered = false;
+        private bool _isPressed = false;
+        private bool _isSelected = false; // Trạng thái được chọn (Active)
+
+        public CustomButton()
+        {
+            // Thiết lập mặc định
+            Height = UIConstants.Sizes.ButtonHeight;
+            Width = UIConstants.Sizes.ButtonWidthMedium;
+            Padding = UIConstants.Spacing.Padding.Button;
+            Margin = UIConstants.Spacing.Margin.Button;
+            Font = ThemeManager.Instance.FontRegular;
+            FlatStyle = FlatStyle.Flat;
+            FlatAppearance.BorderSize = 0;
+            FlatAppearance.MouseDownBackColor = Color.Transparent;
+            FlatAppearance.MouseOverBackColor = Color.Transparent;
+            Cursor = Cursors.Hand;
+            
+            // Subscribe events
+            ThemeManager.Instance.ThemeChanged += OnThemeChanged;
+            
+            ApplyStyle();
+            
+            // Double buffering
+            SetStyle(ControlStyles.UserPaint | 
+                     ControlStyles.AllPaintingInWmPaint | 
+                     ControlStyles.OptimizedDoubleBuffer | 
+                     ControlStyles.ResizeRedraw | 
+                     ControlStyles.SupportsTransparentBackColor, true);
+            
+            UpdateStyles();
+        }
+
+        // Properties
+        public ButtonStyle ButtonStyleType
+        {
+            get => _buttonStyle;
+            set
+            {
+                _buttonStyle = value;
+                ApplyStyle();
+                Invalidate();
+            }
+        }
+
+        public int BorderRadius
+        {
+            get => _borderRadius;
+            set
+            {
+                _borderRadius = value;
+                Invalidate();
+            }
+        }
+
+        public bool IsSelected
+        {
+            get => _isSelected;
+            set
+            {
+                _isSelected = value;
+                Invalidate();
+            }
+        }
+
+        private void OnThemeChanged(object sender, EventArgs e)
+        {
+            ApplyStyle();
+        }
+
+        private void ApplyStyle()
+        {
+            Color backColor, foreColor, borderColor;
+            bool hasBorder = true;
+            
+            switch (_buttonStyle)
+            {
+                case ButtonStyle.Outlined:
+                    // Nền BG, viền PrimaryColor
+                    backColor = ThemeManager.Instance.BackgroundDefault;
+                    foreColor = ThemeManager.Instance.PrimaryDefault;
+                    borderColor = ThemeManager.Instance.PrimaryDefault;
+                    hasBorder = true;
+                    break;
+                    
+                case ButtonStyle.Filled:
+                    // Nền PrimaryColor, viền BG (hoặc viền cùng màu)
+                    backColor = ThemeManager.Instance.PrimaryDefault;
+                    foreColor = UIConstants.TextOnColor.Default;
+                    borderColor = ThemeManager.Instance.BackgroundDefault;
+                    hasBorder = true;
+                    break;
+                    
+                case ButtonStyle.Text:
+                    // Nền BG, không có viền
+                    backColor = ThemeManager.Instance.BackgroundDefault;
+                    foreColor = ThemeManager.Instance.PrimaryDefault;
+                    borderColor = Color.Transparent;
+                    hasBorder = false;
+                    break;
+                    
+                case ButtonStyle.FilledNoOutline:
+                    // Nền PrimaryColor, không có viền
+                    backColor = ThemeManager.Instance.PrimaryDefault;
+                    foreColor = UIConstants.TextOnColor.Default;
+                    borderColor = Color.Transparent;
+                    hasBorder = false;
+                    break;
+                    
+                case ButtonStyle.FilledNoOutlineRed:
+                    // Nền đỏ (Error), không có viền
+                    backColor = UIConstants.SemanticColors.Error;
+                    foreColor = UIConstants.TextOnColor.Default;
+                    borderColor = Color.Transparent;
+                    hasBorder = false;
+                    break;
+                    
+                case ButtonStyle.Ghost:
+                    // Nền và viền Transparent
+                    backColor = Color.Transparent;
+                    foreColor = ThemeManager.Instance.PrimaryDefault;
+                    borderColor = Color.Transparent;
+                    hasBorder = false;
+                    break;
+                    
+                default:
+                    backColor = ThemeManager.Instance.PrimaryDefault;
+                    foreColor = UIConstants.TextOnColor.Default;
+                    borderColor = ThemeManager.Instance.PrimaryDefault;
+                    hasBorder = true;
+                    break;
+            }
+
+            BackColor = backColor;
+            ForeColor = foreColor;
+            
+            // Chỉ set BorderColor khi có border (không phải Transparent)
+            // Windows Forms không cho phép set BorderColor = Transparent
+            if (hasBorder)
+            {
+                FlatAppearance.BorderSize = 0; // Vẫn set 0 vì ta tự vẽ border trong OnPaint
+                // Không set BorderColor vì ta tự vẽ
+            }
+            else
+            {
+                FlatAppearance.BorderSize = 0;
+            }
+        }
+
+        protected override void OnMouseEnter(EventArgs e)
+        {
+            base.OnMouseEnter(e);
+            _isHovered = true;
+            Invalidate();
+        }
+
+        protected override void OnMouseLeave(EventArgs e)
+        {
+            base.OnMouseLeave(e);
+            _isHovered = false;
+            Invalidate();
+        }
+
+        protected override void OnMouseDown(MouseEventArgs e)
+        {
+            base.OnMouseDown(e);
+            _isPressed = true;
+            Invalidate();
+        }
+
+        protected override void OnMouseUp(MouseEventArgs e)
+        {
+            base.OnMouseUp(e);
+            _isPressed = false;
+            Invalidate();
+        }
+
+        protected override void OnPaint(PaintEventArgs pevent)
+        {
+            // KHÔNG gọi base.OnPaint() vì UserPaint = true
+            
+            Graphics g = pevent.Graphics;
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            
+            // Clear toàn bộ để tránh backdrop
+            g.Clear(Parent?.BackColor ?? ThemeManager.Instance.BackgroundDefault);
+            
+            // Determine colors based on state
+            Color backColor = GetBackgroundColor();
+            Color foreColor = GetForegroundColor();
+            Color borderColor = GetBorderColor();
+            
+            // Rectangle cho background (full size)
+            Rectangle bgRect = ClientRectangle;
+            
+            // Rectangle cho border (shrink để border không bị clip)
+            Rectangle borderRect = new Rectangle(
+                ClientRectangle.X,
+                ClientRectangle.Y,
+                ClientRectangle.Width - 1,
+                ClientRectangle.Height - 1
+            );
+            
+            // Draw background
+            using (GraphicsPath bgPath = GetRoundedRectanglePath(bgRect, _borderRadius))
+            {
+                using (SolidBrush brush = new SolidBrush(backColor))
+                {
+                    g.FillPath(brush, bgPath);
+                }
+            }
+            
+            // Draw border nếu có
+            if (borderColor != Color.Transparent)
+            {
+                using (GraphicsPath borderPath = GetRoundedRectanglePath(borderRect, _borderRadius))
+                {
+                    using (Pen pen = new Pen(borderColor, UIConstants.Borders.BorderThickness))
+                    {
+                        g.DrawPath(pen, borderPath);
+                    }
+                }
+            }
+            
+            // Draw text
+            // Draw text with respect to TextAlign
+            TextFormatFlags flags = TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis;
+            
+            // Map TextAlign to TextFormatFlags
+            switch (TextAlign)
+            {
+                case ContentAlignment.TopLeft:
+                case ContentAlignment.MiddleLeft:
+                case ContentAlignment.BottomLeft:
+                    flags |= TextFormatFlags.Left;
+                    break;
+                case ContentAlignment.TopCenter:
+                case ContentAlignment.MiddleCenter:
+                case ContentAlignment.BottomCenter:
+                    flags |= TextFormatFlags.HorizontalCenter;
+                    break;
+                case ContentAlignment.TopRight:
+                case ContentAlignment.MiddleRight:
+                case ContentAlignment.BottomRight:
+                    flags |= TextFormatFlags.Right;
+                    break;
+            }
+
+            Rectangle textRect = ClientRectangle;
+            // Adjust text rect for padding if alignment is not center
+            if ((flags & TextFormatFlags.Left) == TextFormatFlags.Left)
+            {
+                textRect.X += Padding.Left;
+                textRect.Width -= Padding.Left + Padding.Right;
+            }
+            else if ((flags & TextFormatFlags.Right) == TextFormatFlags.Right)
+            {
+                textRect.Width -= Padding.Right;
+            }
+            
+            TextRenderer.DrawText(g, Text, Font, textRect, foreColor, flags);
+        }
+
+        private Color GetBackgroundColor()
+        {
+            if (!Enabled)
+            {
+                if (_buttonStyle == ButtonStyle.Outlined || _buttonStyle == ButtonStyle.Text)
+                    return ThemeManager.Instance.BackgroundLight;
+                if (_buttonStyle == ButtonStyle.FilledNoOutlineRed)
+                    return Color.FromArgb(200, UIConstants.SemanticColors.Error);
+                return ThemeManager.Instance.PrimaryDisabled;
+            }
+
+            if (_isSelected && _buttonStyle == ButtonStyle.Menu)
+            {
+                return ThemeManager.Instance.PrimaryActive; 
+            }
+
+            if (_isPressed)
+            {
+                if (_buttonStyle == ButtonStyle.Outlined || _buttonStyle == ButtonStyle.Text)
+                    return ThemeManager.Instance.BackgroundMedium;
+                if (_buttonStyle == ButtonStyle.FilledNoOutlineRed)
+                    return ControlPaint.Dark(UIConstants.SemanticColors.Error);
+                return ThemeManager.Instance.PrimaryPressed;
+            }
+
+            if (_isHovered)
+            {
+                if (_buttonStyle == ButtonStyle.Outlined || _buttonStyle == ButtonStyle.Text)
+                    return ThemeManager.Instance.BackgroundLight;
+                if (_buttonStyle == ButtonStyle.FilledNoOutlineRed)
+                    return ControlPaint.Light(UIConstants.SemanticColors.Error);
+                return ThemeManager.Instance.PrimaryHover;
+            }
+
+            // Menu Style Logic
+            if (_buttonStyle == ButtonStyle.Menu)
+            {
+                return Color.Transparent; // Default transparent
+            }
+
+            switch (_buttonStyle)
+            {
+                case ButtonStyle.Outlined:
+                case ButtonStyle.Text:
+                    return ThemeManager.Instance.BackgroundDefault;
+                case ButtonStyle.Filled:
+                case ButtonStyle.FilledNoOutline:
+                    return ThemeManager.Instance.PrimaryDefault;
+                case ButtonStyle.FilledNoOutlineRed:
+                    return UIConstants.SemanticColors.Error;
+                case ButtonStyle.Ghost:
+                    return Color.Transparent;
+                default:
+                    return ThemeManager.Instance.PrimaryDefault;
+            }
+        }
+
+        private Color GetForegroundColor()
+        {
+            if (!Enabled)
+            {
+                return ThemeManager.Instance.TextDisabled;
+            }
+            
+            if (_buttonStyle == ButtonStyle.Menu)
+            {
+                if (_isHovered || _isPressed || _isSelected)
+                    return UIConstants.TextOnColor.Default;
+                return ThemeManager.Instance.PrimaryDefault;
+            }
+
+            switch (_buttonStyle)
+            {
+                case ButtonStyle.Outlined:
+                case ButtonStyle.Text:
+                case ButtonStyle.Ghost:
+                    return ThemeManager.Instance.PrimaryDefault;
+                case ButtonStyle.Filled:
+                case ButtonStyle.FilledNoOutline:
+                case ButtonStyle.FilledNoOutlineRed:
+                    return UIConstants.TextOnColor.Default;
+                default:
+                    return UIConstants.TextOnColor.Default;
+            }
+        }
+
+        private Color GetBorderColor()
+        {
+            if (!Enabled)
+            {
+                return _buttonStyle == ButtonStyle.Outlined 
+                    ? ThemeManager.Instance.PrimaryDisabled 
+                    : Color.Transparent;
+            }
+
+            switch (_buttonStyle)
+            {
+                case ButtonStyle.Outlined:
+                    return ThemeManager.Instance.PrimaryDefault;
+                case ButtonStyle.Filled:
+                    return ThemeManager.Instance.BackgroundDefault;
+                case ButtonStyle.Text:
+                case ButtonStyle.FilledNoOutline:
+                case ButtonStyle.FilledNoOutlineRed:
+                case ButtonStyle.Ghost:
+                case ButtonStyle.Menu:
+                    return Color.Transparent;
+                default:
+                    return ThemeManager.Instance.PrimaryDefault;
+            }
+        }
+
+        private GraphicsPath GetRoundedRectanglePath(Rectangle rect, int radius)
+        {
+            GraphicsPath path = new GraphicsPath();
+            
+            if (radius <= 0)
+            {
+                path.AddRectangle(rect);
+                return path;
+            }
+
+            int diameter = radius * 2;
+            Size size = new Size(diameter, diameter);
+            Rectangle arc = new Rectangle(rect.Location, size);
+
+            // Top left
+            path.AddArc(arc, 180, 90);
+
+            // Top right
+            arc.X = rect.Right - diameter;
+            path.AddArc(arc, 270, 90);
+
+            // Bottom right
+            arc.Y = rect.Bottom - diameter;
+            path.AddArc(arc, 0, 90);
+
+            // Bottom left
+            arc.X = rect.Left;
+            path.AddArc(arc, 90, 90);
+
+            path.CloseFigure();
+            return path;
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                ThemeManager.Instance.ThemeChanged -= OnThemeChanged;
+            }
+            base.Dispose(disposing);
+        }
+    }
+}

@@ -1,0 +1,294 @@
+using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Windows.Forms;
+using WarehouseManagement.Controllers;
+using WarehouseManagement.Models;
+using WarehouseManagement.Views.Forms;
+using WarehouseManagement.UI;
+using WarehouseManagement.UI.Components;
+
+namespace WarehouseManagement.Views.Panels
+{
+    public class CategoriesPanel : Panel, ISearchable
+    {
+        private DataGridView dgvCategories;
+        private CategoryController _categoryController;
+        private List<Category> allCategories;
+
+        public CategoriesPanel()
+        {
+            _categoryController = new CategoryController();
+            InitializeComponent();
+            SettingsForm.SettingsChanged += (s, e) => LoadData();
+            
+            // Subscribe to theme changes
+            ThemeManager.Instance.ThemeChanged += OnThemeChanged;
+            ApplyTheme();
+        }
+
+        private void InitializeComponent()
+        {
+            Dock = DockStyle.Fill;
+            BackColor = ThemeManager.Instance.BackgroundDefault;
+
+            // DataGridView
+            dgvCategories = new DataGridView
+            {
+                Dock = DockStyle.Fill,
+                AutoGenerateColumns = false,
+                AllowUserToAddRows = false,
+                ReadOnly = true,
+                BackgroundColor = ThemeManager.Instance.BackgroundDefault,
+                BorderStyle = BorderStyle.None,
+                CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal,
+                ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.None,
+                EnableHeadersVisualStyles = false,
+                ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle 
+                { 
+                    BackColor = UIConstants.PrimaryColor.Default,
+                    ForeColor = UIConstants.TextOnColor.Default,
+                    Font = ThemeManager.Instance.FontBold
+                },
+                RowHeadersVisible = false,
+                SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+                AllowUserToResizeRows = false,
+                Font = ThemeManager.Instance.FontRegular,
+                RowTemplate = { Height = UIConstants.Sizes.TableRowHeight },
+                ColumnHeadersHeight = UIConstants.Sizes.TableHeaderHeight
+            };
+
+            dgvCategories.Columns.Add(new DataGridViewTextBoxColumn 
+            { 
+                HeaderText = "ID", 
+                DataPropertyName = "CategoryID", 
+                Width = 100,
+                AutoSizeMode = DataGridViewAutoSizeColumnMode.None,
+                DefaultCellStyle = new DataGridViewCellStyle 
+                { 
+                    Alignment = DataGridViewContentAlignment.MiddleCenter,
+                    Padding = new Padding(10, 5, 30, 5)
+                }
+            });
+            
+            dgvCategories.Columns.Add(new DataGridViewTextBoxColumn 
+            { 
+                HeaderText = "Tên Danh Mục", 
+                DataPropertyName = "CategoryName", 
+                AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill,
+                DefaultCellStyle = new DataGridViewCellStyle 
+                { 
+                    Padding = new Padding(10, 5, 30, 5)
+                }
+            });
+            
+            dgvCategories.Columns.Add(new DataGridViewTextBoxColumn 
+            { 
+                HeaderText = "Mô Tả", 
+                DataPropertyName = "Description", 
+                AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill,
+                DefaultCellStyle = new DataGridViewCellStyle 
+                { 
+                    Padding = new Padding(10, 5, 30, 5)
+                }
+            });
+            
+            dgvCategories.Columns.Add(new DataGridViewLinkColumn 
+            { 
+                HeaderText = "", 
+                Width = 60,
+                AutoSizeMode = DataGridViewAutoSizeColumnMode.None,
+                UseColumnTextForLinkValue = true, 
+                Text = UIConstants.Icons.Noo,
+                LinkBehavior = LinkBehavior.NeverUnderline,
+                LinkColor = ThemeManager.Instance.TextPrimary,
+                ActiveLinkColor = UIConstants.SemanticColors.Error,
+                VisitedLinkColor = ThemeManager.Instance.TextPrimary,
+                TrackVisitedState = false,
+                DefaultCellStyle = new DataGridViewCellStyle 
+                { 
+                    Alignment = DataGridViewContentAlignment.MiddleCenter,
+                    Padding = new Padding(10, 5, 10, 5)
+                }
+            });
+
+            // Sync alignment và padding từ content lên header
+            foreach (DataGridViewColumn col in dgvCategories.Columns)
+            {
+                // Copy alignment
+                if (col.DefaultCellStyle.Alignment != DataGridViewContentAlignment.NotSet)
+                {
+                    col.HeaderCell.Style.Alignment = col.DefaultCellStyle.Alignment;
+                }
+                // Copy padding (vì khi set alignment, padding có thể bị mất)
+                col.HeaderCell.Style.Padding = new Padding(10, 5, 10, 5);
+            }
+
+            dgvCategories.CellFormatting += DgvCategories_CellFormatting;
+            dgvCategories.CellClick += DgvCategories_CellClick;
+            dgvCategories.VisibleChanged += (s, e) =>
+            {
+                if (this.Visible)
+                    LoadData();
+            };
+
+            CustomPanel tablePanel = new CustomPanel
+            {
+                Dock = DockStyle.Fill,
+                HasShadow = true,
+                ShowBorder = false,
+                Padding = new Padding(10),
+                BorderRadius = UIConstants.Borders.RadiusMedium,
+                BackColor = ThemeManager.Instance.BackgroundDefault
+            };
+            tablePanel.Controls.Add(dgvCategories);
+            Controls.Add(tablePanel);
+            
+            // Apply Hover Effect
+            Helpers.DataGridViewHelper.ApplyHoverEffect(dgvCategories);
+        }
+
+        private void OnThemeChanged(object sender, EventArgs e)
+        {
+            ApplyTheme();
+        }
+
+        private void ApplyTheme()
+        {
+            BackColor = ThemeManager.Instance.BackgroundDefault;
+            dgvCategories.BackgroundColor = ThemeManager.Instance.BackgroundDefault;
+            dgvCategories.DefaultCellStyle.BackColor = ThemeManager.Instance.BackgroundDefault;
+            dgvCategories.DefaultCellStyle.ForeColor = ThemeManager.Instance.TextPrimary;
+            dgvCategories.DefaultCellStyle.ForeColor = ThemeManager.Instance.TextPrimary;
+            
+            // Apply Selection Effect through Helper
+            Helpers.DataGridViewHelper.ApplySelectionEffect(dgvCategories);
+
+            dgvCategories.ColumnHeadersDefaultCellStyle.BackColor = UIConstants.PrimaryColor.Default;
+            dgvCategories.ColumnHeadersDefaultCellStyle.ForeColor = UIConstants.TextOnColor.Default;
+        }
+
+        public void LoadData()
+        {
+            try
+            {
+                // Load all categories including hidden ones if setting is enabled
+                allCategories = _categoryController.GetAllCategories(SettingsForm.ShowHiddenItems);
+                dgvCategories.DataSource = allCategories;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"{UIConstants.Icons.Noo} Lỗi tải danh mục: {ex.Message}", "Lỗi", 
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        public void Search(string searchText)
+        {
+            try
+            {
+                string search = searchText.ToLower();
+                List<Category> filtered = allCategories.FindAll(c =>
+                    c.CategoryID.ToString().Contains(search) ||
+                    c.CategoryName.ToLower().Contains(search) ||
+                    (c.Description != null && c.Description.ToLower().Contains(search))
+                );
+                dgvCategories.DataSource = filtered;
+            }
+            catch { }
+        }
+
+        private void DgvCategories_CellFormatting(object sender, DataGridViewCellFormattingEventArgs e)
+        {
+            if (e.RowIndex < 0 || e.RowIndex >= dgvCategories.Rows.Count) return;
+            if (e.ColumnIndex != 3) return;
+
+            var category = dgvCategories.Rows[e.RowIndex].DataBoundItem as Category;
+            if (category != null)
+                e.Value = category.Visible ? UIConstants.Icons.Noo : UIConstants.Icons.Left;
+        }
+
+        private void DgvCategories_CellClick(object sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex < 0) return;
+
+            var category = dgvCategories.Rows[e.RowIndex].DataBoundItem as Category;
+            if (category == null) return;
+
+            int categoryId = category.CategoryID;
+            string categoryName = category.CategoryName ?? "";
+            string description = category.Description ?? "";
+
+            // Cột Xóa/Restore (index 3)
+            if (e.ColumnIndex == 3)
+            {
+                if (category.Visible)
+                {
+                    DialogResult result = MessageBox.Show(
+                        $"{UIConstants.Icons.Hmm} Bạn chắc chắn muốn xóa danh mục '{categoryName}'?",
+                        "Xác nhận xóa",
+                        MessageBoxButtons.YesNo,
+                        MessageBoxIcon.Warning);
+
+                    if (result == DialogResult.Yes)
+                    {
+                        try
+                        {
+                            _categoryController.HideCategory(categoryId);
+                            MessageBox.Show($"{UIConstants.Icons.Yes} Danh mục đã được xóa thành công.", "Thành công",
+                                MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            LoadData();
+                        }
+                        catch (Exception ex)
+                        {
+                            MessageBox.Show($"{UIConstants.Icons.Noo} Lỗi xóa danh mục: {ex.Message}", "Lỗi",
+                                MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        }
+                    }
+                }
+                else
+                {
+                    DialogResult result = MessageBox.Show(
+                        $"{UIConstants.Icons.Down} Bạn muốn phục hồi danh mục '{categoryName}'?",
+                        "Xác nhận phục hồi",
+                        MessageBoxButtons.YesNo,
+                        MessageBoxIcon.Question);
+
+                    if (result == DialogResult.Yes)
+                    {
+                        try
+                        {
+                            _categoryController.RestoreCategory(categoryId, categoryName, description);
+                            MessageBox.Show($"{UIConstants.Icons.Yes} Danh mục đã được phục hồi.", "Thành công",
+                                MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            LoadData();
+                        }
+                        catch (Exception ex)
+                        {
+                            MessageBox.Show($"{UIConstants.Icons.Noo} Lỗi phục hồi danh mục: {ex.Message}", "Lỗi",
+                                MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        }
+                    }
+                }
+                return;
+            }
+
+            // Other columns open the edit form
+            CategoryForm form = new CategoryForm(categoryId);
+            if (form.ShowDialog() == DialogResult.OK)
+            {
+                LoadData();
+            }
+            dgvCategories.Rows[e.RowIndex].Selected = true;
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                ThemeManager.Instance.ThemeChanged -= OnThemeChanged;
+            }
+            base.Dispose(disposing);
+        }
+    }
+}
